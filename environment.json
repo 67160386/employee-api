@@ -1,0 +1,28 @@
+{
+  "id": "503d881e-2a2b-4ac5-a37f-037dc682b7bf",
+  "name": "employee-api-dev",
+  "values": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000/api/v1",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "adminToken",
+      "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwiZW1haWwiOiJhZG1pbkBleGFtcGxlLmNvbSIsInJvbGUiOiJhZG1pbiIsImlhdCI6MTc5MTY5OTA2OSwiZXhwIjoxNzkxNzAyNjY5fQ.46BxAokTzcOJfXi0WOM1GmoJWZIAQq3I-JFUdAkxnHM",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "employeeToken",
+      "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MiwiZW1haWwiOiJlbXBsb3llZUBleGFtcGxlLmNvbSIsInJvbGUiOiJlbXBsb3llZSIsImlhdCI6MTc5MTY5OTA5MywiZXhwIjoxNzkxNzAyNjkzfQ.qoIIYlASNoMcc5QbBNvmyaLRvU4FMFwPPHPaaRPG9A8",
+      "type": "default",
+      "enabled": true
+    }
+  ],
+  "color": null,
+  "_postman_variable_scope": "environment",
+  "_postman_exported_at": "2026-10-11T06:12:16.058Z",
+  "_postman_exported_using": "Postman/12.31.7"
+}

@@ -5,6 +5,7 @@ SET FOREIGN_KEY_CHECKS = 0;
 TRUNCATE TABLE leave_requests;
 TRUNCATE TABLE attendance;
 TRUNCATE TABLE employees;
+TRUNCATE TABLE users;
 SET FOREIGN_KEY_CHECKS = 1;
 
 -- เพิ่มข้อมูลพนักงานตัวอย่าง (Table: employees)
@@ -26,3 +27,8 @@ INSERT INTO leave_requests (employee_id, leave_type, start_date, end_date, reaso
 (4, 'SICK', '2026-08-18', '2026-08-18', 'เป็นไข้หวัด มีไข้สูง', 'APPROVED'),
 (2, 'VACATION', '2026-08-25', '2026-08-27', 'พักร้อนต่างจังหวัด', 'PENDING'),
 (1, 'PERSONAL', '2026-08-29', '2026-08-30', 'นอนเล่นที่ห้อง', 'REJECTED');
+
+-- เพิ่มข้อมูลสมาชิก (Table: user)
+INSERT INTO users (email, password_hash, role) VALUES
+  ('admin@example.com', '$2b$10$CmWvWJ9SJV0whc3lMfy4l.zlvWAoyow3mD2F93nyBZdZyiGnUwYha', 'admin'),
+  ('employee@example.com', '$2b$10$DCs7O2/FiQkay5LUUxg9CuqrdmlzjDpJ2JEpzcp0QRS2wHiwFR4HW', 'employee');

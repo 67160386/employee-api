@@ -117,7 +117,7 @@ app.get("/api/v1/employees/:id/attendance", async (req, res, next) => {
   }
 });
 
-// 4. GET: ดึงรายการคำขอลาทั้งหมด
+// 4. GET: ดึงรายการคำขอลาของพนักงานทั้งหมด
 app.get("/api/v1/leave-requests", async (req, res, next) => {
   try {
     const sql = `

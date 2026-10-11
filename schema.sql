@@ -1,4 +1,7 @@
-CREATE DATABASE IF NOT EXISTS employee_api;
+DROP DATABASE IF EXISTS employee_api;
+CREATE DATABASE employee_api
+  CHARACTER SET utf8mb4
+  COLLATE utf8mb4_unicode_ci;
 USE employee_api;
 
 CREATE TABLE employees (
@@ -31,4 +34,12 @@ CREATE TABLE leave_requests (
   status ENUM('PENDING', 'APPROVED', 'REJECTED') DEFAULT 'PENDING', 
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (employee_id) REFERENCES employees(id) ON DELETE CASCADE
+);
+
+CREATE TABLE users (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  email VARCHAR(100) NOT NULL UNIQUE,
+  password_hash VARCHAR(255) NOT NULL,
+  role ENUM('employee', 'admin') NOT NULL DEFAULT 'employee',
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
