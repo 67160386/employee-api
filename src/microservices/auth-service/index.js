@@ -1,18 +1,50 @@
+require("dotenv").config();
 const express = require("express");
-const router = express.Router();
-const pool = require("../db");
+const helmet = require("helmet");
+const cors = require("cors");
+const morgan = require("morgan");
+const pool = require("./db");
 const {
   hashPassword,
   verifyPassword,
   generateToken,
 } = require("../auth-helpers");
-const { authenticateToken } = require("../middleware/auth");
 
-router.get("/me", authenticateToken, (req, res) => {
-  res.status(200).json({ message: "สำเร็จ", data: req.user });
+const app = express();
+app.use(helmet());
+app.use(
+  cors({
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE"],
+  }),
+);
+app.use(morgan("dev"));
+app.use(express.json({ limit: "10kb" }));
+
+// GET /me - ดูข้อมูลผู้ใช้ปัจจุบัน
+app.get("/me", async (req, res, next) => {
+  try {
+    const userId = req.headers["x-user-id"];
+    if (!userId) {
+      return res.status(401).json({ error: { message: "ไม่พบข้อมูลผู้ใช้" } });
+    }
+
+    const [rows] = await pool.query(
+      "SELECT id, email, role FROM users WHERE id = ?",
+      [userId],
+    );
+
+    if (rows.length === 0) {
+      return res.status(404).json({ error: { message: "ไม่พบผู้ใช้" } });
+    }
+
+    res.status(200).json({ message: "สำเร็จ", data: rows[0] });
+  } catch (err) {
+    next(err);
+  }
 });
 
-router.post("/register", async (req, res, next) => {
+// POST /register - สมัครสมาชิก
+app.post("/register", async (req, res, next) => {
   const { email, password } = req.body;
 
   if (!email || !password) {
@@ -45,7 +77,8 @@ router.post("/register", async (req, res, next) => {
   }
 });
 
-router.post("/login", async (req, res, next) => {
+// POST /login - เข้าสู่ระบบ
+app.post("/login", async (req, res, next) => {
   const { email, password } = req.body;
 
   if (!email || !password) {
@@ -90,4 +123,18 @@ router.post("/login", async (req, res, next) => {
   }
 });
 
-module.exports = router;
+// Global Error Handler
+app.use((err, req, res, next) => {
+  console.error(err);
+  res.status(500).json({
+    error: {
+      code: "INTERNAL_ERROR",
+      message: "เกิดข้อผิดพลาดภายใน Auth Service",
+    },
+  });
+});
+
+if (require.main === module) {
+  app.listen(3001, () => console.log(`Auth Service running on port 3001`));
+}
+module.exports = app;

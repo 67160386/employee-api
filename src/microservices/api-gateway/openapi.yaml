@@ -1,30 +1,15 @@
 openapi: 3.0.3
 info:
-  title: Employee API
-  description: ระบบจัดการข้อมูลพนักงาน บันทึกเวลาเข้างาน คำขอลา ข้อมูลเสริมภายนอก (Enrichment) และระบบยืนยันตัวตน (Authentication & Authorization)
+  title: Employee Microservices API (Gateway)
+  description: ระบบจัดการข้อมูลพนักงาน บันทึกเวลาเข้างาน คำขอลา ข้อมูลเสริมภายนอก (Enrichment) และระบบยืนยันตัวตนผ่าน API Gateway
   version: 1.0.0
 servers:
   - url: http://localhost:3000
-    description: Local Development Server
+    description: API Gateway Server
 
 paths:
-  /:
-    get:
-      summary: ตรวจสอบสถานะการทำงานของ API
-      responses:
-        "200":
-          description: Service พร้อมใช้งาน
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  message:
-                    type: string
-                    example: Employee API พร้อมใช้งาน
-
   # ==========================================
-  # AUTHENTICATION
+  # AUTHENTICATION SERVICE
   # ==========================================
   /api/v1/auth/register:
     post:
@@ -65,13 +50,10 @@ paths:
                     properties:
                       id:
                         type: integer
-                        example: 1
                       email:
                         type: string
-                        example: user@example.com
                       role:
                         type: string
-                        example: employee
         "400":
           $ref: "#/components/responses/ValidationError"
         "409":
@@ -80,10 +62,6 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
-              example:
-                error:
-                  code: DUPLICATE_EMAIL
-                  message: อีเมลนี้มีอยู่ในระบบแล้ว
         "500":
           $ref: "#/components/responses/InternalError"
 
@@ -105,11 +83,9 @@ paths:
                 email:
                   type: string
                   format: email
-                  example: user@example.com
                 password:
                   type: string
                   format: password
-                  example: "P@ssw0rd123"
       responses:
         "200":
           description: เข้าสู่ระบบสำเร็จ
@@ -120,10 +96,8 @@ paths:
                 properties:
                   message:
                     type: string
-                    example: เข้าสู่ระบบสำเร็จ
                   token:
                     type: string
-                    example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
         "400":
           $ref: "#/components/responses/ValidationError"
         "401":
@@ -132,10 +106,6 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
-              example:
-                error:
-                  code: INVALID_CREDENTIALS
-                  message: อีเมลหรือรหัสผ่านไม่ถูกต้อง
         "500":
           $ref: "#/components/responses/InternalError"
 
@@ -156,26 +126,24 @@ paths:
                 properties:
                   message:
                     type: string
-                    example: สำเร็จ
                   data:
                     type: object
                     properties:
                       id:
                         type: integer
-                        example: 1
                       email:
                         type: string
-                        example: user@example.com
                       role:
                         type: string
-                        example: employee
         "401":
           $ref: "#/components/responses/UnauthorizedError"
+        "404":
+          $ref: "#/components/responses/NotFoundError"
         "500":
           $ref: "#/components/responses/InternalError"
 
   # ==========================================
-  # EMPLOYEES & RELATED SUB-RESOURCES
+  # EMPLOYEE SERVICE
   # ==========================================
   /api/v1/employees:
     get:
@@ -194,20 +162,16 @@ paths:
                 properties:
                   message:
                     type: string
-                    example: ดึงข้อมูลพนักงานสำเร็จ
                   total:
                     type: integer
-                    example: 2
                   data:
                     type: array
                     items:
                       $ref: "#/components/schemas/Employee"
-        "401":
-          $ref: "#/components/responses/UnauthorizedError"
         "500":
           $ref: "#/components/responses/InternalError"
     post:
-      summary: เพิ่มข้อมูลพนักงานใหม่ (Admin Only)
+      summary: เพิ่มข้อมูลพนักงานใหม่ (Admin)
       tags:
         - Employees
       security:
@@ -225,13 +189,10 @@ paths:
               properties:
                 employeeCode:
                   type: string
-                  example: EMP001
                 name:
                   type: string
-                  example: สมชาย ใจดี
                 department:
                   type: string
-                  example: IT
       responses:
         "201":
           description: เพิ่มข้อมูลพนักงานสำเร็จ
@@ -242,13 +203,10 @@ paths:
                 properties:
                   message:
                     type: string
-                    example: เพิ่มข้อมูลพนักงานสำเร็จ
                   data:
                     $ref: "#/components/schemas/Employee"
         "400":
           $ref: "#/components/responses/ValidationError"
-        "401":
-          $ref: "#/components/responses/UnauthorizedError"
         "403":
           $ref: "#/components/responses/ForbiddenError"
         "409":
@@ -257,23 +215,19 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
-              example:
-                error:
-                  code: DUPLICATE_ENTRY
-                  message: รหัสพนักงานนี้มีอยู่ในระบบแล้ว
         "500":
           $ref: "#/components/responses/InternalError"
 
   /api/v1/employees/attendance:
     get:
-      summary: ดึงประวัติการเข้างานของพนักงานทั้งหมด (Admin Only)
+      summary: ดึงประวัติการเข้างานพนักงานทั้งหมด (Admin)
       tags:
         - Employees
       security:
         - BearerAuth: []
       responses:
         "200":
-          description: ดึงข้อมูลการเข้างานพนักงานทั้งหมดสำเร็จ
+          description: สำเร็จ
           content:
             application/json:
               schema:
@@ -281,16 +235,12 @@ paths:
                 properties:
                   message:
                     type: string
-                    example: ดึงข้อมูลการเข้างานพนักงานทั้งหมดสำเร็จ
                   total:
                     type: integer
-                    example: 1
                   data:
                     type: array
                     items:
                       $ref: "#/components/schemas/AttendanceOverview"
-        "401":
-          $ref: "#/components/responses/UnauthorizedError"
         "403":
           $ref: "#/components/responses/ForbiddenError"
         "500":
@@ -301,19 +251,17 @@ paths:
       - name: id
         in: path
         required: true
-        description: รหัส ID ของพนักงาน
         schema:
           type: integer
-          example: 1
     get:
-      summary: ดึงข้อมูลพนักงานเฉพาะรายบุคคล
+      summary: ดึงข้อมูลพนักงานรายบุคคล
       tags:
         - Employees
       security:
         - BearerAuth: []
       responses:
         "200":
-          description: ดึงข้อมูลพนักงานสำเร็จ
+          description: สำเร็จ
           content:
             application/json:
               schema:
@@ -321,17 +269,14 @@ paths:
                 properties:
                   message:
                     type: string
-                    example: ดึงข้อมูลพนักงานสำเร็จ
                   data:
                     $ref: "#/components/schemas/Employee"
-        "401":
-          $ref: "#/components/responses/UnauthorizedError"
         "404":
           $ref: "#/components/responses/NotFoundError"
         "500":
           $ref: "#/components/responses/InternalError"
     put:
-      summary: แก้ไขข้อมูลพนักงานทั้งระเบียนเฉพาะรายบุคคล (Admin Only)
+      summary: แก้ไขพนักงาน (Admin)
       tags:
         - Employees
       security:
@@ -342,19 +287,16 @@ paths:
           application/json:
             schema:
               type: object
-              required:
-                - name
-                - department
               properties:
+                employeeCode:
+                  type: string
                 name:
                   type: string
-                  example: สมชาย มีสุข
                 department:
                   type: string
-                  example: HR
       responses:
         "200":
-          description: อัปเดตข้อมูลพนักงานสำเร็จ
+          description: อัปเดตสำเร็จ
           content:
             application/json:
               schema:
@@ -362,23 +304,8 @@ paths:
                 properties:
                   message:
                     type: string
-                    example: อัปเดตข้อมูลพนักงานสำเร็จ
                   data:
-                    type: object
-                    properties:
-                      id:
-                        type: integer
-                        example: 1
-                      name:
-                        type: string
-                        example: สมชาย มีสุข
-                      department:
-                        type: string
-                        example: HR
-        "400":
-          $ref: "#/components/responses/BadRequestError"
-        "401":
-          $ref: "#/components/responses/UnauthorizedError"
+                    $ref: "#/components/schemas/Employee"
         "403":
           $ref: "#/components/responses/ForbiddenError"
         "404":
@@ -386,14 +313,14 @@ paths:
         "500":
           $ref: "#/components/responses/InternalError"
     delete:
-      summary: ลบข้อมูลพนักงานเฉพาะรายบุคคล (Admin Only)
+      summary: ลบพนักงาน (Admin)
       tags:
         - Employees
       security:
         - BearerAuth: []
       responses:
         "200":
-          description: ลบข้อมูลพนักงานสำเร็จ
+          description: ลบข้อมูลสำเร็จ
           content:
             application/json:
               schema:
@@ -401,11 +328,8 @@ paths:
                 properties:
                   message:
                     type: string
-                    example: ลบข้อมูลพนักงานสำเร็จ
                   employee:
                     $ref: "#/components/schemas/Employee"
-        "401":
-          $ref: "#/components/responses/UnauthorizedError"
         "403":
           $ref: "#/components/responses/ForbiddenError"
         "404":
@@ -418,12 +342,10 @@ paths:
       - name: id
         in: path
         required: true
-        description: รหัส ID ของพนักงาน
         schema:
           type: integer
-          example: 1
     get:
-      summary: ดึงประวัติการเข้างานของพนักงานเฉพาะรายบุคคล (Admin Only)
+      summary: ดึงประวัติการเข้างานรายบุคคล (Admin)
       tags:
         - Employees
       security:
@@ -431,23 +353,17 @@ paths:
       parameters:
         - name: startDate
           in: query
-          required: false
-          description: วันที่เริ่มต้น (YYYY-MM-DD)
           schema:
             type: string
             format: date
-            example: 2026-10-01
         - name: endDate
           in: query
-          required: false
-          description: วันที่สิ้นสุด (YYYY-MM-DD)
           schema:
             type: string
             format: date
-            example: 2026-10-10
       responses:
         "200":
-          description: ดึงข้อมูลการเข้างานพนักงานสำเร็จ
+          description: สำเร็จ
           content:
             application/json:
               schema:
@@ -455,18 +371,14 @@ paths:
                 properties:
                   message:
                     type: string
-                    example: ดึงข้อมูลการเข้างานพนักงานสำเร็จ
                   employee:
                     $ref: "#/components/schemas/EmployeeSimple"
                   total:
                     type: integer
-                    example: 1
                   data:
                     type: array
                     items:
                       $ref: "#/components/schemas/Attendance"
-        "401":
-          $ref: "#/components/responses/UnauthorizedError"
         "403":
           $ref: "#/components/responses/ForbiddenError"
         "404":
@@ -474,7 +386,7 @@ paths:
         "500":
           $ref: "#/components/responses/InternalError"
     post:
-      summary: บันทึกเวลาเข้างานของพนักงานเฉพาะรายบุคคล (Admin Only)
+      summary: ลงเวลาเข้างาน (Admin)
       tags:
         - Employees
       security:
@@ -492,19 +404,13 @@ paths:
                 work_date:
                   type: string
                   format: date
-                  example: 2026-10-10
                 check_in:
                   type: string
-                  example: "08:30:00"
                 check_out:
                   type: string
-                  nullable: true
-                  example: "17:30:00"
                 status:
                   type: string
                   enum: [ON_TIME, LATE]
-                  default: ON_TIME
-                  example: ON_TIME
       responses:
         "201":
           description: บันทึกเวลาเข้างานสำเร็จ
@@ -515,29 +421,63 @@ paths:
                 properties:
                   message:
                     type: string
-                    example: บันทึกเวลาเข้างานสำเร็จ
                   employee:
                     $ref: "#/components/schemas/EmployeeSimple"
                   data:
                     $ref: "#/components/schemas/Attendance"
         "400":
           $ref: "#/components/responses/BadRequestError"
-        "401":
-          $ref: "#/components/responses/UnauthorizedError"
         "403":
           $ref: "#/components/responses/ForbiddenError"
         "404":
           $ref: "#/components/responses/NotFoundError"
         "409":
-          description: บันทึกเวลาเข้างานของวันนี้ซ้ำ
+          description: บันทึกเวลาซ้ำ
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
-              example:
-                error:
-                  code: DUPLICATE_ATTENDANCE
-                  message: พนักงานคนนี้ได้บันทึกเวลาเข้างานวันนี้ไปแล้ว
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /api/v1/employees/{employee_id}/attendance/{attendance_id}:
+    parameters:
+      - name: employee_id
+        in: path
+        required: true
+        schema:
+          type: integer
+      - name: attendance_id
+        in: path
+        required: true
+        schema:
+          type: integer
+    patch:
+      summary: แก้ไขประวัติการลงเวลา (Admin)
+      tags:
+        - Employees
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                check_in:
+                  type: string
+                check_out:
+                  type: string
+                status:
+                  type: string
+      responses:
+        "200":
+          description: สำเร็จ
+        "403":
+          $ref: "#/components/responses/ForbiddenError"
+        "404":
+          $ref: "#/components/responses/NotFoundError"
         "500":
           $ref: "#/components/responses/InternalError"
 
@@ -546,19 +486,17 @@ paths:
       - name: id
         in: path
         required: true
-        description: รหัส ID ของพนักงาน
         schema:
           type: integer
-          example: 1
     get:
-      summary: ดึงประวัติการลาของพนักงานเฉพาะรายบุคคล (Admin Only)
+      summary: ดึงประวัติการลารายบุคคล
       tags:
         - Employees
       security:
         - BearerAuth: []
       responses:
         "200":
-          description: ดึงข้อมูลประวัติการลาสำเร็จ
+          description: สำเร็จ
           content:
             application/json:
               schema:
@@ -566,30 +504,22 @@ paths:
                 properties:
                   message:
                     type: string
-                    example: ดึงข้อมูลประวัติการลาสำเร็จ
                   employee_id:
                     type: integer
-                    example: 1
                   employee_name:
                     type: string
-                    example: สมชาย ใจดี
                   total:
                     type: integer
-                    example: 1
                   data:
                     type: array
                     items:
                       $ref: "#/components/schemas/LeaveRequestItem"
-        "401":
-          $ref: "#/components/responses/UnauthorizedError"
-        "403":
-          $ref: "#/components/responses/ForbiddenError"
         "404":
           $ref: "#/components/responses/NotFoundError"
         "500":
           $ref: "#/components/responses/InternalError"
     post:
-      summary: ยื่นคำขอลาของพนักงานเฉพาะรายบุคคล
+      summary: ยื่นคำขอลา
       tags:
         - Employees
       security:
@@ -608,22 +538,17 @@ paths:
                 leave_type:
                   type: string
                   enum: [SICK, PERSONAL, VACATION]
-                  example: SICK
                 start_date:
                   type: string
                   format: date
-                  example: 2026-10-15
                 end_date:
                   type: string
                   format: date
-                  example: 2026-10-16
                 reason:
                   type: string
-                  nullable: true
-                  example: ป่วยเป็นไข้หวัด
       responses:
         "201":
-          description: ยื่นคำขอลาเรียบร้อยแล้ว
+          description: ยื่นคำขอลาสำเร็จ
           content:
             application/json:
               schema:
@@ -631,38 +556,10 @@ paths:
                 properties:
                   message:
                     type: string
-                    example: ยื่นคำขอลาเรียบร้อยแล้ว
                   data:
-                    type: object
-                    properties:
-                      id:
-                        type: integer
-                        example: 5
-                      employee_id:
-                        type: integer
-                        example: 1
-                      leave_type:
-                        type: string
-                        example: SICK
-                      start_date:
-                        type: string
-                        format: date
-                        example: 2026-10-15
-                      end_date:
-                        type: string
-                        format: date
-                        example: 2026-10-16
-                      reason:
-                        type: string
-                        nullable: true
-                        example: ป่วยเป็นไข้หวัด
-                      status:
-                        type: string
-                        example: PENDING
+                    $ref: "#/components/schemas/LeaveRequestItem"
         "400":
           $ref: "#/components/responses/BadRequestError"
-        "401":
-          $ref: "#/components/responses/UnauthorizedError"
         "404":
           $ref: "#/components/responses/NotFoundError"
         "500":
@@ -673,19 +570,17 @@ paths:
       - name: id
         in: path
         required: true
-        description: รหัส ID ของพนักงาน
         schema:
           type: integer
-          example: 1
     get:
-      summary: ข้อมูลเสริมจาก Public API ภายนอก พร้อม Retry/Timeout/Fallback
+      summary: ข้อมูลเสริมจาก External API
       tags:
         - Employees
       security:
         - BearerAuth: []
       responses:
         "200":
-          description: ดึงข้อมูลเสริมสำเร็จ
+          description: สำเร็จ
           content:
             application/json:
               schema:
@@ -696,91 +591,24 @@ paths:
                     properties:
                       employeeId:
                         type: string
-                        example: "1"
                       enrichment:
                         type: object
-                        description: ข้อมูลที่ enrich มาจากบริการภายนอก
-                        additionalProperties: true
-        "401":
-          $ref: "#/components/responses/UnauthorizedError"
-        "500":
-          $ref: "#/components/responses/InternalError"
-
-  /api/v1/employees/{employee_id}/attendance/{attendance_id}:
-    parameters:
-      - name: employee_id
-        in: path
-        required: true
-        description: รหัส ID ของพนักงาน
-        schema:
-          type: integer
-          example: 1
-      - name: attendance_id
-        in: path
-        required: true
-        description: รหัส ID ของรายการลงเวลา
-        schema:
-          type: integer
-          example: 10
-    patch:
-      summary: แก้ไขข้อมูลการลงเวลาของพนักงานเฉพาะรายบุคคล (Admin Only)
-      tags:
-        - Employees
-      security:
-        - BearerAuth: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                check_in:
-                  type: string
-                  example: "08:45:00"
-                check_out:
-                  type: string
-                  example: "17:45:00"
-                status:
-                  type: string
-                  example: LATE
-      responses:
-        "200":
-          description: อัปเดตข้อมูลการลงเวลาเรียบร้อย
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  message:
-                    type: string
-                    example: อัปเดตข้อมูลการลงเวลาเรียบร้อย
-                  employee:
-                    $ref: "#/components/schemas/EmployeeSimple"
-                  data:
-                    $ref: "#/components/schemas/Attendance"
-        "401":
-          $ref: "#/components/responses/UnauthorizedError"
-        "403":
-          $ref: "#/components/responses/ForbiddenError"
-        "404":
-          $ref: "#/components/responses/NotFoundError"
         "500":
           $ref: "#/components/responses/InternalError"
 
   # ==========================================
-  # LEAVE REQUESTS OVERVIEW & APPROVAL
+  # LEAVE REQUESTS SERVICE
   # ==========================================
   /api/v1/leave-requests:
     get:
-      summary: ดึงรายการคำขอลาของพนักงานทั้งหมด (Admin Only)
+      summary: ดึงรายการคำขอลาทั้งหมด (Admin)
       tags:
         - Leave Requests
       security:
         - BearerAuth: []
       responses:
         "200":
-          description: ดึงข้อมูลคำขอลาสำเร็จ
+          description: สำเร็จ
           content:
             application/json:
               schema:
@@ -788,13 +616,10 @@ paths:
                 properties:
                   total:
                     type: integer
-                    example: 1
                   data:
                     type: array
                     items:
                       $ref: "#/components/schemas/LeaveRequestOverview"
-        "401":
-          $ref: "#/components/responses/UnauthorizedError"
         "403":
           $ref: "#/components/responses/ForbiddenError"
         "500":
@@ -805,12 +630,10 @@ paths:
       - name: id
         in: path
         required: true
-        description: รหัส ID ของคำขอลา
         schema:
           type: integer
-          example: 5
     patch:
-      summary: อนุมัติหรือปฏิเสธคำขอลา (Admin Only)
+      summary: อนุมัติ/ปฏิเสธคำขอลา (Admin)
       tags:
         - Leave Requests
       security:
@@ -827,10 +650,9 @@ paths:
                 status:
                   type: string
                   enum: [APPROVED, REJECTED]
-                  example: APPROVED
       responses:
         "200":
-          description: อัปเดตสถานะคำขอลาสำเร็จ
+          description: สำเร็จ
           content:
             application/json:
               schema:
@@ -838,20 +660,15 @@ paths:
                 properties:
                   message:
                     type: string
-                    example: อัปเดตสถานะคำขอลาเป็น APPROVED เรียบร้อยแล้ว
                   data:
                     type: object
                     properties:
                       id:
                         type: integer
-                        example: 5
                       status:
                         type: string
-                        example: APPROVED
         "400":
           $ref: "#/components/responses/BadRequestError"
-        "401":
-          $ref: "#/components/responses/UnauthorizedError"
         "403":
           $ref: "#/components/responses/ForbiddenError"
         "404":
@@ -859,16 +676,13 @@ paths:
         "500":
           $ref: "#/components/responses/InternalError"
 
-# ==========================================
-# COMPONENTS & SCHEMAS
-# ==========================================
 components:
   securitySchemes:
     BearerAuth:
       type: http
       scheme: bearer
       bearerFormat: JWT
-      description: ส่งค่า JWT Token ใน Header รูปแบบ `Bearer <token>`
+      description: รูปแบบ `Bearer <token>`
 
   schemas:
     Employee:
@@ -876,126 +690,88 @@ components:
       properties:
         id:
           type: integer
-          example: 1
         employeeCode:
           type: string
-          example: EMP001
         name:
           type: string
-          example: สมชาย ใจดี
         department:
           type: string
-          example: IT
 
     EmployeeSimple:
       type: object
       properties:
         id:
           type: integer
-          example: 1
         name:
           type: string
-          example: สมชาย ใจดี
         department:
           type: string
-          example: IT
 
     Attendance:
       type: object
       properties:
         id:
           type: integer
-          example: 1
-        attendance_id:
-          type: integer
-          example: 10
         employee_id:
           type: integer
-          example: 1
         work_date:
           type: string
           format: date
-          example: 2026-10-10
         check_in:
           type: string
-          example: "08:30:00"
         check_out:
           type: string
-          nullable: true
-          example: "17:30:00"
         status:
           type: string
-          example: ON_TIME
 
     AttendanceOverview:
       type: object
       properties:
         id:
           type: integer
-          example: 1
         employee_id:
           type: integer
-          example: 1
         employeeCode:
           type: string
-          example: EMP001
         employee_name:
           type: string
-          example: สมชาย ใจดี
         department:
           type: string
-          example: IT
         work_date:
           type: string
           format: date
-          example: 2026-10-10
         check_in:
           type: string
-          example: "08:30:00"
         check_out:
           type: string
-          nullable: true
-          example: "17:30:00"
         status:
           type: string
-          example: ON_TIME
 
     LeaveRequestOverview:
       type: object
       properties:
         id:
           type: integer
-          example: 1
         employee_id:
           type: integer
-          example: 1
         employeeCode:
           type: string
-          example: EMP001
         employee_name:
           type: string
-          example: สมชาย ใจดี
         department:
           type: string
-          example: IT
         leave_type:
           type: string
-          example: SICK
         start_date:
           type: string
           format: date
-          example: 2026-10-15
         end_date:
           type: string
           format: date
-          example: 2026-10-16
         reason:
           type: string
-          nullable: true
-          example: ป่วย
         status:
           type: string
-          example: PENDING
         created_at:
           type: string
           format: date-time
@@ -1005,25 +781,20 @@ components:
       properties:
         id:
           type: integer
-          example: 1
+        employee_id:
+          type: integer
         leave_type:
           type: string
-          example: SICK
         start_date:
           type: string
           format: date
-          example: 2026-10-15
         end_date:
           type: string
           format: date
-          example: 2026-10-16
         reason:
           type: string
-          nullable: true
-          example: ป่วย
         status:
           type: string
-          example: PENDING
         created_at:
           type: string
           format: date-time
@@ -1033,10 +804,8 @@ components:
       properties:
         code:
           type: string
-          example: NOT_FOUND
         message:
           type: string
-          example: ไม่พบข้อมูลที่ต้องการ
 
     ErrorResponse:
       type: object
@@ -1051,57 +820,33 @@ components:
         application/json:
           schema:
             $ref: "#/components/schemas/ErrorResponse"
-          example:
-            error:
-              code: NOT_FOUND
-              message: ไม่พบข้อมูลพนักงาน
     BadRequestError:
       description: คำขอไม่ถูกต้องหรือข้อมูลไม่ครบถ้วน
       content:
         application/json:
           schema:
             $ref: "#/components/schemas/ErrorResponse"
-          example:
-            error:
-              code: BAD_REQUEST
-              message: กรุณากรอกข้อมูลให้ครบถ้วน
     ValidationError:
       description: ข้อมูล validation ไม่ผ่าน
       content:
         application/json:
           schema:
             $ref: "#/components/schemas/ErrorResponse"
-          example:
-            error:
-              code: VALIDATION_ERROR
-              message: กรุณาระบุข้อมูลให้ครบถ้วน
     UnauthorizedError:
       description: ไม่พบ Token หรือ Token ไม่ถูกต้อง/หมดอายุ
       content:
         application/json:
           schema:
             $ref: "#/components/schemas/ErrorResponse"
-          example:
-            error:
-              code: UNAUTHORIZED
-              message: กรุณาเข้าสู่ระบบก่อนใช้งาน
     ForbiddenError:
-      description: ไม่มีสิทธิ์เข้าถึงเส้นทางนี้ (ต้องใช้สิทธิ์ Admin)
+      description: ไม่มีสิทธิ์เข้าถึง (Forbidden)
       content:
         application/json:
           schema:
             $ref: "#/components/schemas/ErrorResponse"
-          example:
-            error:
-              code: FORBIDDEN
-              message: คุณไม่มีสิทธิ์ในการดำเนินการนี้
     InternalError:
-      description: ข้อผิดพลาดภายในระบบเซิร์ฟเวอร์
+      description: ข้อผิดพลาดภายในระบบ
       content:
         application/json:
           schema:
             $ref: "#/components/schemas/ErrorResponse"
-          example:
-            error:
-              code: INTERNAL_ERROR
-              message: เกิดข้อผิดพลาดภายในระบบ

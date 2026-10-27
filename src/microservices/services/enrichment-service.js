@@ -1,14 +1,14 @@
 const { fetchWithRetry } = require("./external-api");
 
 async function getEmployeeEnrichment(employeeId) {
-  const url = `https://jsonplaceholder.typicode.com/todos/${employeeId}`;
+  const url = `https://jsonplaceholder.typicode.com/users/${employeeId}`;
 
   try {
     const data = await fetchWithRetry(url, 3000, 2);
     return {
       source: "external",
       available: true,
-      note: data.title,
+      note: data,
     };
   } catch (error) {
     console.error(

@@ -10,10 +10,10 @@ SET FOREIGN_KEY_CHECKS = 1;
 
 -- เพิ่มข้อมูลพนักงานตัวอย่าง (Table: employees)
 INSERT INTO employees (id, employeeCode, name, department) VALUES
-(1, 'EMP001', 'สมชาย ใจดี', 'IT'),
-(2, 'EMP002', 'สมหญิง รักสงบ', 'HR'),
-(3, 'EMP003', 'อนันต์ ขยันยิ่ง', 'IT'),
-(4, 'EMP004', 'กนกวรรณ มีสุข', 'Marketing');
+(1, 'EMP001', 'วิชัย ไปไม่ทัน', 'IT'),
+(2, 'EMP002', 'บุญมี แต่กรรมบัง', 'HR'),
+(3, 'EMP003', 'สมเกียรติ เครียดทุกวัน', 'SA'),
+(4, 'EMP004', 'ประสิทธิ์ จิตหลุด', 'Marketing');
 
 -- เพิ่มข้อมูลประวัติการเข้า-ออกงานตัวอย่าง (Table: attendance)
 INSERT INTO attendance (employee_id, work_date, check_in, check_out, status) VALUES
@@ -26,7 +26,7 @@ INSERT INTO attendance (employee_id, work_date, check_in, check_out, status) VAL
 INSERT INTO leave_requests (employee_id, leave_type, start_date, end_date, reason, status) VALUES
 (4, 'SICK', '2026-08-18', '2026-08-18', 'เป็นไข้หวัด มีไข้สูง', 'APPROVED'),
 (2, 'VACATION', '2026-08-25', '2026-08-27', 'พักร้อนต่างจังหวัด', 'PENDING'),
-(1, 'PERSONAL', '2026-08-29', '2026-08-30', 'นอนเล่นที่ห้อง', 'REJECTED');
+(1, 'PERSONAL', '2026-08-29', '2026-08-30', 'นอนเล่น', 'REJECTED');
 
 -- เพิ่มข้อมูลสมาชิก (Table: user)
 INSERT INTO users (email, password_hash, role) VALUES

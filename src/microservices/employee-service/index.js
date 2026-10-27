@@ -1,31 +1,34 @@
 require("dotenv").config();
-
 const express = require("express");
 const helmet = require("helmet");
 const cors = require("cors");
 const morgan = require("morgan");
+const pool = require("./db");
+const { getEmployeeEnrichment } = require("../services/enrichment-service");
 
 const app = express();
-const PORT = process.env.PORT || 3000;
-
-const pool = require("./db");
-
 app.use(helmet());
 app.use(
   cors({
-    origin: process.env.ALLOWED_ORIGIN,
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE"],
   }),
 );
 app.use(morgan("dev"));
 app.use(express.json({ limit: "10kb" }));
 
-app.get("/", (req, res) => {
-  res.status(200).json({ message: "Employee API พร้อมใช้งาน" });
-});
+// Middleware เช็กสิทธิ์ Admin จาก Header ที่ Gateway ส่งมา
+const requireAdmin = (req, res, next) => {
+  const role = req.headers["x-user-role"];
+  if (role !== "admin") {
+    return res
+      .status(403)
+      .json({ error: { message: "ไม่มีสิทธิ์เข้าถึงข้อมูลส่วนนี้" } });
+  }
+  next();
+};
 
-// 1. GET: ดึงรายการพนักงานทั้งหมด
-app.get("/api/v1/employees", async (req, res, next) => {
+// GET / - ดึงรายการพนักงานทั้งหมด
+app.get("/", async (req, res, next) => {
   try {
     const [rows] = await pool.query("SELECT * FROM employees");
     res.status(200).json({
@@ -38,8 +41,28 @@ app.get("/api/v1/employees", async (req, res, next) => {
   }
 });
 
-// 2. GET: ดึงข้อมูลพนักงานเฉพาะรายบุคคล
-app.get("/api/v1/employees/:id", async (req, res, next) => {
+// GET /attendance - ดึงประวัติการเข้างานพนักงานทั้งหมด (Admin)
+app.get("/attendance", requireAdmin, async (req, res, next) => {
+  try {
+    const [rows] = await pool.query(`
+      SELECT 
+        a.id, a.employee_id, e.employeeCode, e.name AS employee_name, e.department,
+        DATE_FORMAT(a.work_date, '%Y-%m-%d') AS work_date, a.check_in, a.check_out, a.status
+      FROM attendance a
+      JOIN employees e ON a.employee_id = e.id
+    `);
+    res.status(200).json({
+      message: "ดึงข้อมูลการเข้างานพนักงานทั้งหมดสำเร็จ",
+      total: rows.length,
+      data: rows,
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// GET /:id - ดึงข้อมูลพนักงานรายบุคคล
+app.get("/:id", async (req, res, next) => {
   try {
     const { id } = req.params;
     const [rows] = await pool.query("SELECT * FROM employees WHERE id = ?", [
@@ -47,25 +70,19 @@ app.get("/api/v1/employees/:id", async (req, res, next) => {
     ]);
 
     if (rows.length === 0) {
-      return res.status(404).json({
-        error: {
-          code: "NOT_FOUND",
-          message: "ไม่พบข้อมูลพนักงาน",
-        },
-      });
+      return res
+        .status(404)
+        .json({ error: { code: "NOT_FOUND", message: "ไม่พบข้อมูลพนักงาน" } });
     }
 
-    res.status(200).json({
-      message: "ดึงข้อมูลพนักงานสำเร็จ",
-      data: rows[0],
-    });
+    res.status(200).json({ message: "ดึงข้อมูลพนักงานสำเร็จ", data: rows[0] });
   } catch (err) {
     next(err);
   }
 });
 
-// 3. GET: ดึงประวัติการเข้างานของพนักงานเฉพาะรายบุคคล
-app.get("/api/v1/employees/:id/attendance", async (req, res, next) => {
+// GET /:id/attendance - ดึงประวัติการเข้างานรายบุคคล (Admin)
+app.get("/:id/attendance", requireAdmin, async (req, res, next) => {
   try {
     const { id } = req.params;
     const { startDate, endDate } = req.query;
@@ -74,7 +91,6 @@ app.get("/api/v1/employees/:id/attendance", async (req, res, next) => {
       "SELECT id, name, department FROM employees WHERE id = ?",
       [id],
     );
-
     if (employee.length === 0) {
       return res
         .status(404)
@@ -96,18 +112,11 @@ app.get("/api/v1/employees/:id/attendance", async (req, res, next) => {
     }
 
     const [rows] = await pool.query(sql, params);
-
-    if (rows.length === 0) {
-      return res.status(200).json({
-        message: "ยังไม่มีประวัติการลงเวลาทำงานของพนักงาน",
-        employee: employee[0],
-        total: rows.length,
-        data: [],
-      });
-    }
-
     res.status(200).json({
-      message: "ดึงข้อมูลการเข้างานพนักงานสำเร็จ",
+      message:
+        rows.length === 0
+          ? "ยังไม่มีประวัติการลงเวลาทำงานของพนักงาน"
+          : "ดึงข้อมูลการเข้างานพนักงานสำเร็จ",
       employee: employee[0],
       total: rows.length,
       data: rows,
@@ -117,71 +126,26 @@ app.get("/api/v1/employees/:id/attendance", async (req, res, next) => {
   }
 });
 
-// 4. GET: ดึงรายการคำขอลาของพนักงานทั้งหมด
-app.get("/api/v1/leave-requests", async (req, res, next) => {
-  try {
-    const sql = `
-      SELECT 
-        l.id,
-        l.employee_id,
-        e.employeeCode,
-        e.name AS employee_name,
-        e.department,
-        l.leave_type,
-        DATE_FORMAT(l.start_date, '%Y-%m-%d') AS start_date,
-        DATE_FORMAT(l.end_date, '%Y-%m-%d') AS end_date,
-        l.reason,
-        l.status,
-        l.created_at
-      FROM leave_requests l
-      JOIN employees e ON l.employee_id = e.id
-      ORDER BY l.created_at DESC
-    `;
-
-    const [rows] = await pool.query(sql);
-
-    res.status(200).json({
-      total: rows.length,
-      data: rows,
-    });
-  } catch (err) {
-    next(err);
-  }
-});
-
-// 5. GET: ดึงประวัติการลาของพนักงานเฉพาะรายบุคคล
-app.get("/api/v1/employees/:id/leave-requests", async (req, res, next) => {
+// GET /:id/leave-requests - ดึงประวัติการลารายบุคคล
+app.get("/:id/leave-requests", async (req, res, next) => {
   try {
     const { id } = req.params;
-
     const [employee] = await pool.query(
       "SELECT id, name FROM employees WHERE id = ?",
       [id],
     );
 
     if (employee.length === 0) {
-      return res.status(404).json({
-        error: {
-          code: "NOT_FOUND",
-          message: "ไม่พบข้อมูลพนักงาน",
-        },
-      });
+      return res
+        .status(404)
+        .json({ error: { code: "NOT_FOUND", message: "ไม่พบข้อมูลพนักงาน" } });
     }
 
     const sql = `
-      SELECT 
-        id,
-        leave_type,
-        DATE_FORMAT(start_date, '%Y-%m-%d') AS start_date,
-        DATE_FORMAT(end_date, '%Y-%m-%d') AS end_date,
-        reason,
-        status,
-        created_at
-      FROM leave_requests 
-      WHERE employee_id = ? 
-      ORDER BY created_at DESC
+      SELECT id, leave_type, DATE_FORMAT(start_date, '%Y-%m-%d') AS start_date,
+             DATE_FORMAT(end_date, '%Y-%m-%d') AS end_date, reason, status, created_at
+      FROM leave_requests WHERE employee_id = ? ORDER BY created_at DESC
     `;
-
     const [rows] = await pool.query(sql, [id]);
 
     res.status(200).json({
@@ -199,11 +163,20 @@ app.get("/api/v1/employees/:id/leave-requests", async (req, res, next) => {
   }
 });
 
-// 6. POST: เพิ่มข้อมูลพนักงานใหม่
-app.post("/api/v1/employees", async (req, res, next) => {
+// GET /:id/enrichment - ข้อมูลเสริมจาก External API
+app.get("/:id/enrichment", async (req, res, next) => {
+  try {
+    const enrichment = await getEmployeeEnrichment(req.params.id);
+    res.status(200).json({ data: { employeeId: req.params.id, enrichment } });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// POST / - เพิ่มพนักงานใหม่ (Admin)
+app.post("/", requireAdmin, async (req, res, next) => {
   try {
     const { employeeCode, name, department } = req.body;
-
     if (!employeeCode || !name || !department) {
       return res.status(400).json({
         error: {
@@ -235,8 +208,8 @@ app.post("/api/v1/employees", async (req, res, next) => {
   }
 });
 
-// 7. POST: บันทึกเวลาเข้างานของพนักงานเฉพาะรายบุคคล
-app.post("/api/v1/employees/:id/attendance", async (req, res, next) => {
+// POST /:id/attendance - ลงเวลาเข้างาน (Admin)
+app.post("/:id/attendance", requireAdmin, async (req, res, next) => {
   try {
     const { id } = req.params;
     const { work_date, check_in, check_out, status } = req.body;
@@ -254,18 +227,13 @@ app.post("/api/v1/employees/:id/attendance", async (req, res, next) => {
       "SELECT id, name, department FROM employees WHERE id = ?",
       [id],
     );
-
     if (employee.length === 0) {
-      return res.status(404).json({
-        error: {
-          code: "NOT_FOUND",
-          message: "ไม่พบข้อมูลพนักงาน",
-        },
-      });
+      return res
+        .status(404)
+        .json({ error: { code: "NOT_FOUND", message: "ไม่พบข้อมูลพนักงาน" } });
     }
 
     const attendanceStatus = status || "ON_TIME";
-
     const [result] = await pool.query(
       "INSERT INTO attendance (employee_id, work_date, check_in, check_out, status) VALUES (?, ?, ?, ?, ?)",
       [id, work_date, check_in, check_out || null, attendanceStatus],
@@ -296,8 +264,8 @@ app.post("/api/v1/employees/:id/attendance", async (req, res, next) => {
   }
 });
 
-// 8. POST: ยื่นคำขอลาของพนักงานเฉพาะรายบุคคล
-app.post("/api/v1/employees/:id/leave-requests", async (req, res, next) => {
+// POST /:id/leave-requests - ยื่นคำขอลา
+app.post("/:id/leave-requests", async (req, res, next) => {
   try {
     const { id } = req.params;
     const { leave_type, start_date, end_date, reason } = req.body;
@@ -317,15 +285,13 @@ app.post("/api/v1/employees/:id/leave-requests", async (req, res, next) => {
       [id],
     );
     if (employee.length === 0) {
-      return res.status(404).json({
-        error: { code: "NOT_FOUND", message: "ไม่พบข้อมูลพนักงาน" },
-      });
+      return res
+        .status(404)
+        .json({ error: { code: "NOT_FOUND", message: "ไม่พบข้อมูลพนักงาน" } });
     }
 
     const formattedLeaveType = String(leave_type).toUpperCase();
-    const validLeaveTypes = ["SICK", "PERSONAL", "VACATION"];
-
-    if (!validLeaveTypes.includes(formattedLeaveType)) {
+    if (!["SICK", "PERSONAL", "VACATION"].includes(formattedLeaveType)) {
       return res.status(400).json({
         error: {
           code: "BAD_REQUEST",
@@ -336,8 +302,7 @@ app.post("/api/v1/employees/:id/leave-requests", async (req, res, next) => {
     }
 
     const [result] = await pool.query(
-      `INSERT INTO leave_requests (employee_id, leave_type, start_date, end_date, reason) 
-       VALUES (?, ?, ?, ?, ?)`,
+      "INSERT INTO leave_requests (employee_id, leave_type, start_date, end_date, reason) VALUES (?, ?, ?, ?, ?)",
       [id, formattedLeaveType, start_date, end_date, reason || null],
     );
 
@@ -358,13 +323,13 @@ app.post("/api/v1/employees/:id/leave-requests", async (req, res, next) => {
   }
 });
 
-// 9. PUT: แก้ไขข้อมูลพนักงานทั้งระเบียนเฉพาะรายบุคคล
-app.put("/api/v1/employees/:id", async (req, res, next) => {
+// PUT /:id - แก้ไขพนักงาน (Admin)
+app.put("/:id", requireAdmin, async (req, res, next) => {
   try {
     const { id } = req.params;
-    const { name, department } = req.body;
+    const { employeeCode, name, department } = req.body;
 
-    if (!name || !department) {
+    if (!employeeCode || !name || !department) {
       return res.status(400).json({
         error: {
           code: "BAD_REQUEST",
@@ -374,32 +339,28 @@ app.put("/api/v1/employees/:id", async (req, res, next) => {
     }
 
     const [result] = await pool.query(
-      "UPDATE employees SET name = ?, department = ? WHERE id = ?",
-      [name, department, id],
+      "UPDATE employees SET employeeCode = ?, name = ?, department = ? WHERE id = ?",
+      [employeeCode, name, department, id],
     );
-
     if (result.affectedRows === 0) {
-      return res.status(404).json({
-        error: { code: "NOT_FOUND", message: "ไม่พบข้อมูลพนักงาน" },
-      });
+      return res
+        .status(404)
+        .json({ error: { code: "NOT_FOUND", message: "ไม่พบข้อมูลพนักงาน" } });
     }
 
     res.status(200).json({
       message: "อัปเดตข้อมูลพนักงานสำเร็จ",
-      data: {
-        id: Number(id),
-        name,
-        department,
-      },
+      data: { id: Number(id), employeeCode, name, department },
     });
   } catch (err) {
     next(err);
   }
 });
 
-// 10. PATCH: แก้ไขข้อมูลการลงเวลาของพนักงานเฉพาะรายบุคคล
+// PATCH /:employee_id/attendance/:attendance_id - แก้ไขประวัติการลงเวลา (Admin)
 app.patch(
-  "/api/v1/employees/:employee_id/attendance/:attendance_id",
+  "/:employee_id/attendance/:attendance_id",
+  requireAdmin,
   async (req, res, next) => {
     try {
       const { employee_id, attendance_id } = req.params;
@@ -409,7 +370,6 @@ app.patch(
         "SELECT id, name, department FROM employees WHERE id = ?",
         [employee_id],
       );
-
       if (employee.length === 0) {
         return res.status(404).json({
           error: { code: "NOT_FOUND", message: "ไม่พบข้อมูลพนักงาน" },
@@ -417,21 +377,16 @@ app.patch(
       }
 
       const [existing] = await pool.query(
-        `SELECT 
-           id, 
-           employee_id, 
-           DATE_FORMAT(work_date, '%Y-%m-%d') AS work_date, 
-           check_in, 
-           check_out, 
-           status 
-         FROM attendance 
-         WHERE id = ? AND employee_id = ?`,
+        "SELECT id, employee_id, DATE_FORMAT(work_date, '%Y-%m-%d') AS work_date, check_in, check_out, status FROM attendance WHERE id = ? AND employee_id = ?",
         [attendance_id, employee_id],
       );
 
       if (existing.length === 0) {
         return res.status(404).json({
-          error: { code: "NOT_FOUND", message: "ไม่พบข้อมูลการลงเวลาพนักงาน" },
+          error: {
+            code: "NOT_FOUND",
+            message: "ไม่พบข้อมูลการลงเวลาพนักงาน",
+          },
         });
       }
 
@@ -452,7 +407,7 @@ app.patch(
         ],
       );
 
-      return res.status(200).json({
+      res.status(200).json({
         message: "อัปเดตข้อมูลการลงเวลาเรียบร้อย",
         employee: employee[0],
         data: {
@@ -470,93 +425,42 @@ app.patch(
   },
 );
 
-// 11. PATCH: อนุมัติหรือปฏิเสธคำขอลาของพนักงานเฉพาะรายบุคคล
-app.patch("/api/v1/leave-requests/:id", async (req, res, next) => {
+// DELETE /:id - ลบพนักงาน (Admin)
+app.delete("/:id", requireAdmin, async (req, res, next) => {
   try {
     const { id } = req.params;
-    const { status } = req.body;
-
-    if (!status || !["APPROVED", "REJECTED"].includes(status)) {
-      return res.status(400).json({
-        error: {
-          code: "BAD_REQUEST",
-          message: "สถานะต้องเป็น 'APPROVED' หรือ 'REJECTED' เท่านั้น",
-        },
-      });
-    }
-
-    const [result] = await pool.query(
-      "UPDATE leave_requests SET status = ? WHERE id = ?",
-      [status, id],
-    );
-
-    if (result.affectedRows === 0) {
-      return res.status(404).json({
-        error: { code: "NOT_FOUND", message: "ไม่พบข้อมูลคำขอลาของพนักงาน" },
-      });
-    }
-
-    res.status(200).json({
-      message: `อัปเดตสถานะคำขอลาเป็น ${status} เรียบร้อยแล้ว`,
-      data: { id: Number(id), status },
-    });
-  } catch (err) {
-    next(err);
-  }
-});
-
-// 12. DELETE: ลบข้อมูลพนักงานเฉพาะรายบุคคล
-app.delete("/api/v1/employees/:id", async (req, res, next) => {
-  try {
-    const { id } = req.params;
-
     const [employee] = await pool.query(
       "SELECT * FROM employees WHERE id = ?",
       [id],
     );
 
     if (employee.length === 0) {
-      return res.status(404).json({
-        error: {
-          code: "NOT_FOUND",
-          message: "ไม่พบข้อมูลพนักงาน",
-        },
-      });
+      return res
+        .status(404)
+        .json({ error: { code: "NOT_FOUND", message: "ไม่พบข้อมูลพนักงาน" } });
     }
 
     await pool.query("DELETE FROM employees WHERE id = ?", [id]);
-
-    res.status(200).json({
-      message: "ลบข้อมูลพนักงานสำเร็จ",
-      employee: employee[0],
-    });
+    res
+      .status(200)
+      .json({ message: "ลบข้อมูลพนักงานสำเร็จ", employee: employee[0] });
   } catch (err) {
     next(err);
   }
 });
 
-// 404: NOT_FOUND
-app.use((req, res) => {
-  res.status(404).json({
-    error: { code: "ROUTE_NOT_FOUND", message: "ไม่พบเส้นทางที่ร้องขอ" },
-  });
-});
-
-// ERROR
+// Global Error Handler
 app.use((err, req, res, next) => {
-  console.error(err.stack);
-  const statusCode = err.status || err.statusCode || 500;
-  res.status(statusCode).json({
+  console.error(err);
+  res.status(500).json({
     error: {
-      code: statusCode === 500 ? "INTERNAL_SERVER_ERROR" : err.type || "ERROR",
-      message:
-        statusCode === 500
-          ? "เกิดข้อผิดพลาดที่ไม่คาดคิดภายในระบบ"
-          : err.message,
+      code: "INTERNAL_ERROR",
+      message: "เกิดข้อผิดพลาดภายใน Employee Service",
     },
   });
 });
 
-app.listen(PORT, () => {
-  console.log(`Server กำลังทำงานที่พอร์ต ${PORT} (${process.env.NODE_ENV})`);
-});
+if (require.main === module) {
+  app.listen(3002, () => console.log(`Employee Service running on port 3002`));
+}
+module.exports = app;
